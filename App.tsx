@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, CalendarClock, FileText, ChevronRight, Download, Upload, Menu, X } from 'lucide-react';
+import { LayoutDashboard, CalendarClock, ChevronRight, Download, Upload, Menu, X } from 'lucide-react';
 
 // Import types and components
-import type { Week, Day, Task, KPI, Template, Note, View, TemplateTask } from './types';
+import type { Week, Day, Task, KPI, Note, View } from './types';
 import { TaskStatus, TaskType } from './types';
 import { SEED_KPIS } from './data/seed';
 import Dashboard from './components/Dashboard';
@@ -14,7 +14,6 @@ import TemplatesView from './components/TemplatesView';
 type AppState = {
   weeks: Week[];
   kpis: KPI[];
-  templates: Template[];
   notes: Note[];
 };
 
@@ -23,69 +22,6 @@ const KEY = "app12_transformation_plan_v2";
 const uid = () => `id-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const iso = (d: Date) => d.toISOString().split('T')[0];
 
-// ===== NOVA distribuição por capacidade diária =====
-function distributeTemplateIntoWeekByCapacity(wk: Week, tpl: Template): Week {
-  const makeTask = (t: Template["tasks"][number]): Task => ({
-    id: uid(),
-    title: t.title,
-    type: t.type,
-    estimated_minutes: t.estimated_minutes,
-    status: TaskStatus.Todo,
-  });
-
-  // Fila de tarefas do template
-  const queue = tpl.tasks.map(makeTask);
-
-  const days = wk.days.map((day) => {
-    let remaining = day.planned_minutes;
-    const tasks: Task[] = [];
-
-    // Aloca tarefas do template enquanto couber
-    while (queue.length > 0 && queue[0].estimated_minutes <= remaining) {
-      const next = queue.shift()!;
-      tasks.push(next);
-      remaining -= next.estimated_minutes;
-    }
-
-    // Preenche com blocos de revisão/prática
-    const fillerTitle = `Revisão/Prática – ${tpl.title}`;
-    const pushFiller = (mins: number) => {
-      tasks.push({
-        id: uid(),
-        title: fillerTitle,
-        type: TaskType.Review,
-        estimated_minutes: mins,
-        status: TaskStatus.Todo,
-      });
-    };
-
-    while (remaining >= 60) { pushFiller(60); remaining -= 60; }
-    if (remaining >= 30) { pushFiller(30); remaining -= 30; }
-
-    // Garante ao menos 1 tarefa no dia
-    if (tasks.length === 0) {
-      pushFiller(Math.min(60, day.planned_minutes));
-    }
-
-    return { ...day, tasks };
-  });
-
-  // Se sobrar tarefa do template, reparte 1 por dia em segunda passada
-  if (queue.length > 0) {
-    let idx = 0;
-    while (queue.length > 0) {
-      const t = queue.shift()!;
-      const di = idx % days.length;
-      days[di] = { ...days[di], tasks: [...days[di].tasks, t] };
-      idx++;
-    }
-  }
-
-  return { ...wk, days, status: "in-progress", title: tpl.title, goal: tpl.goal };
-}
-
-
-// ===== NOVA initialState (12 semanas preenchidas) =====
 function initialState(): AppState {
   // segunda-feira da semana atual
   const now = new Date();
@@ -122,7 +58,7 @@ function initialState(): AppState {
   ];
 
   // Cria as 12 semanas
-  let weeks: Week[] = Array.from({ length: 12 }).map((_, i) =>
+  const weeks: Week[] = Array.from({ length: 12 }).map((_, i) =>
     makeWeek(
       new Date(monday.getTime() + i * 7 * 24 * 60 * 60 * 1000),
       i + 1,
@@ -131,21 +67,23 @@ function initialState(): AppState {
     )
   );
 
-  // Templates começam vazios
-  const templates: Template[] = [];
-
-  // Aplica automaticamente o template correspondente em CADA semana
-  weeks = weeks.map((wk) => {
-    const tpl = templates.find(t => t.week_number === wk.number);
-    return tpl ? distributeTemplateIntoWeekByCapacity(wk, tpl) : wk;
-  });
-
   // Semana 1 já fica "in_progress"
   if (weeks.length > 0) {
       weeks[0].status = 'in-progress';
   }
   
-  return { weeks, kpis: SEED_KPIS, templates, notes: [] };
+  return { weeks, kpis: SEED_KPIS, notes: [] };
+}
+
+function inferTaskType(title: string): TaskType {
+    const lowerTitle = title.toLowerCase();
+    if (/\b(revisão|review|simulado|recap|documentar)\b/.test(lowerTitle)) {
+        return TaskType.Review;
+    }
+    if (/\b(prática|practice|exercícios|exercises|construir|build|teste|test|mini-CRM|integrador)\b/.test(lowerTitle)) {
+        return TaskType.Practice;
+    }
+    return TaskType.Study;
 }
 
 
@@ -153,7 +91,6 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [weeks, setWeeks] = useState<Week[]>([]);
   const [kpis, setKpis] = useState<KPI[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
 
   const [view, setView] = useState<View>('dashboard');
@@ -167,7 +104,6 @@ function App() {
       const state = initialState();
       setWeeks(state.weeks);
       setKpis(state.kpis);
-      setTemplates(state.templates);
       setNotes(state.notes);
     };
 
@@ -175,14 +111,11 @@ function App() {
         const rawState = localStorage.getItem(KEY);
         if (rawState) {
           const state: AppState = JSON.parse(rawState);
-          // Check for essential data, if not present, reload initial state
-          // This handles cases where the app structure changed.
-          if (!state.weeks || state.weeks.length < 12 || !state.kpis || !state.templates) {
+          if (!state.weeks || state.weeks.length < 12 || !state.kpis) {
             loadInitialState();
           } else {
             setWeeks(state.weeks);
             setKpis(state.kpis);
-            setTemplates(state.templates);
             setNotes(state.notes || []);
           }
         } else {
@@ -197,10 +130,10 @@ function App() {
 
   useEffect(() => {
     if (isInitialized) {
-      const state: AppState = { weeks, kpis, templates, notes };
+      const state: AppState = { weeks, kpis, notes };
       localStorage.setItem(KEY, JSON.stringify(state));
     }
-  }, [weeks, kpis, templates, notes, isInitialized]);
+  }, [weeks, kpis, notes, isInitialized]);
   
   // Find today's date and corresponding day object
   const todayISO = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -229,25 +162,71 @@ function App() {
     });
   };
 
-  const handleApplyTemplate = (weekNumber: number, templateId: string) => {
-    const template = templates.find(t => t.id === templateId);
-    if (!template) return;
+  const handleImportFromText = (text: string, weekNumber: number) => {
+      try {
+        const weekIndex = weeks.findIndex(w => w.number === weekNumber);
+        if (weekIndex === -1) throw new Error("Semana não encontrada.");
 
-    setWeeks(prevWeeks => {
-      const newWeeks = JSON.parse(JSON.stringify(prevWeeks));
-      const weekIndex = newWeeks.findIndex(w => w.number === weekNumber);
-      if (weekIndex === -1) return prevWeeks;
-      
-      const pristineWeeks = initialState().weeks;
-      const originalWeekStructure = pristineWeeks.find(w => w.number === weekNumber);
+        const targetWeek = JSON.parse(JSON.stringify(weeks[weekIndex]));
 
-      if (originalWeekStructure) {
-        const weekWithTemplate = distributeTemplateIntoWeekByCapacity(originalWeekStructure, template);
-        newWeeks[weekIndex] = weekWithTemplate;
+        const titleRegex = /📅 Semana \d+ – (.*)/;
+        const goalRegex = /Meta: (.*)/;
+        
+        const titleMatch = text.match(titleRegex);
+        if (titleMatch && titleMatch[1]) {
+            targetWeek.title = titleMatch[1].trim();
+        }
+        const goalMatch = text.match(goalRegex);
+        if (goalMatch && goalMatch[1]) {
+            targetWeek.goal = goalMatch[1].trim();
+        }
+        
+        targetWeek.days.forEach((day: Day) => day.tasks = []);
+
+        const dayNames = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
+        const dayIndices: { [key: string]: number } = { 'segunda-feira': 0, 'terça-feira': 1, 'quarta-feira': 2, 'quinta-feira': 3, 'sexta-feira': 4, 'sábado': 5, 'domingo': 6 };
+        const dayRegex = new RegExp(`^(${dayNames.join('|')})`, 'gmi');
+        const taskRegex = /-\s*(.+?)\s*\((\d+)min\)/g;
+
+        const dayMatches = Array.from(text.matchAll(dayRegex));
+
+        dayMatches.forEach((match, i) => {
+            const dayName = match[1].toLowerCase();
+            const dayIndex = dayIndices[dayName];
+            if (dayIndex === undefined) return;
+
+            const startIndex = match.index! + match[0].length;
+            const endIndex = i + 1 < dayMatches.length ? dayMatches[i + 1].index! : text.length;
+            const dayContent = text.substring(startIndex, endIndex);
+
+            const taskMatches = Array.from(dayContent.matchAll(taskRegex));
+            const newTasks: Task[] = taskMatches.map(taskMatch => {
+                const title = taskMatch[1].trim();
+                const minutes = parseInt(taskMatch[2], 10);
+                return {
+                    id: uid(),
+                    title,
+                    estimated_minutes: minutes,
+                    type: inferTaskType(title),
+                    status: TaskStatus.Todo
+                };
+            });
+            
+            if (targetWeek.days[dayIndex]) {
+                targetWeek.days[dayIndex].tasks = newTasks;
+            }
+        });
+        
+        setWeeks(prevWeeks => {
+            const newWeeks = [...prevWeeks];
+            newWeeks[weekIndex] = targetWeek;
+            return newWeeks;
+        });
+
+      } catch(e) {
+          console.error("Falha ao importar do texto:", e);
+          alert("Ocorreu um erro ao importar o plano. Verifique o formato do texto e tente novamente.");
       }
-
-      return newWeeks;
-    });
   };
 
   const handleAddNote = (dayId: string, content: string) => {
@@ -295,9 +274,8 @@ function App() {
       case 'weeks':
         return <WeekView 
                     week={weeks.find(w => w.number === activeWeek)}
-                    templates={templates}
                     onTaskStatusChange={handleTaskStatusChange}
-                    onApplyTemplate={handleApplyTemplate}
+                    onImportFromText={handleImportFromText}
                 />;
       case 'today':
         return <TodayView
@@ -307,8 +285,6 @@ function App() {
                     onTaskStatusChange={handleTaskStatusChange}
                     onAddNote={handleAddNote}
                 />;
-      case 'templates':
-        return <TemplatesView templates={templates} setTemplates={setTemplates} />;
       default:
         return <Dashboard weeks={weeks} kpis={kpis} />;
     }
@@ -331,7 +307,6 @@ function App() {
     dashboard: 'Painel',
     weeks: `Semana ${activeWeek}`,
     today: 'Foco de Hoje',
-    templates: 'Gerenciar Templates'
   };
 
   return (
@@ -362,7 +337,6 @@ function App() {
             <nav className="p-4 space-y-2">
                 <NavItem icon={LayoutDashboard} label="Painel" isActive={view === 'dashboard'} onClick={() => { setView('dashboard'); }} isCollapsed={isSidebarCollapsed} />
                 <NavItem icon={CalendarClock} label="Hoje" isActive={view === 'today'} onClick={() => { setView('today'); }} isCollapsed={isSidebarCollapsed}/>
-                <NavItem icon={FileText} label="Templates" isActive={view === 'templates'} onClick={() => { setView('templates'); }} isCollapsed={isSidebarCollapsed}/>
             </nav>
 
             <div className="flex-1 p-4 overflow-y-auto">

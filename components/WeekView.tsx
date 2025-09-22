@@ -1,15 +1,13 @@
-
 import React, { useState } from 'react';
-import type { Week, Day, Task, Template } from '../types';
+import type { Week, Day, Task } from '../types';
 import { TaskStatus, TaskType } from '../types';
-import { Check, Circle, SkipForward, Clock, BookOpen, Wrench, RefreshCw, PlusCircle, CheckCircle } from 'lucide-react';
+import { Check, Circle, SkipForward, Clock, BookOpen, Wrench, RefreshCw, CheckCircle, FileText } from 'lucide-react';
 import Modal from './Modal';
 
 interface WeekViewProps {
   week?: Week;
   onTaskStatusChange: (weekNumber: number, dayIndex: number, taskIndex: number, status: TaskStatus) => void;
-  onApplyTemplate: (weekNumber: number, templateId: string) => void;
-  templates: Template[];
+  onImportFromText: (text: string, weekNumber: number) => void;
 }
 
 const TaskTypeIcon = ({ type }: { type: TaskType }) => {
@@ -72,20 +70,20 @@ const DayCard: React.FC<{ day: Day, onTaskStatusChange: (taskIndex: number, stat
     );
 };
 
-const WeekView: React.FC<WeekViewProps> = ({ week, onTaskStatusChange, onApplyTemplate, templates }) => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+const WeekView: React.FC<WeekViewProps> = ({ week, onTaskStatusChange, onImportFromText }) => {
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importText, setImportText] = useState('');
 
     if (!week) {
         return <div className="text-center text-gray-400">Selecione uma semana para ver seus detalhes.</div>;
     }
     
-    const handleConfirmApply = () => {
-        if(selectedTemplate) {
-            onApplyTemplate(week.number, selectedTemplate);
+    const handleConfirmImport = () => {
+        if(importText) {
+            onImportFromText(importText, week.number);
         }
-        setIsModalOpen(false);
-        setSelectedTemplate('');
+        setIsImportModalOpen(false);
+        setImportText('');
     };
 
     return (
@@ -95,13 +93,15 @@ const WeekView: React.FC<WeekViewProps> = ({ week, onTaskStatusChange, onApplyTe
                     <h1 className="text-3xl font-bold text-white">Semana {week.number}: {week.title}</h1>
                     <p className="mt-1 text-gray-400">{week.goal}</p>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                >
-                    <PlusCircle size={20} />
-                    <span>Aplicar Template</span>
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                    >
+                        <FileText size={20} />
+                        <span>Importar de Texto</span>
+                    </button>
+                </div>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -113,26 +113,28 @@ const WeekView: React.FC<WeekViewProps> = ({ week, onTaskStatusChange, onApplyTe
                     />
                 ))}
             </div>
-
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Aplicar um Template">
+            
+            <Modal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} title={`Importar Plano para Semana ${week.number}`}>
                 <div className="space-y-4">
-                    <p className="text-gray-300">Selecione um template para aplicar à Semana {week.number}. Isso substituirá todas as tarefas existentes para esta semana.</p>
-                    <select
-                        value={selectedTemplate}
-                        onChange={(e) => setSelectedTemplate(e.target.value)}
-                        className="w-full bg-gray-700 border-gray-600 text-white rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                        <option value="" disabled>Selecione um template</option>
-                        {templates.map(t => (
-                            <option key={t.id} value={t.id}>{t.title}</option>
-                        ))}
-                    </select>
+                    <p className="text-gray-300">Cole o plano de texto para a Semana {week.number} abaixo. O plano existente será substituído.</p>
+                    <textarea
+                        value={importText}
+                        onChange={(e) => setImportText(e.target.value)}
+                        className="w-full h-64 bg-gray-900 border-gray-600 text-gray-200 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono"
+                        placeholder={`📅 Semana ${week.number} – Título da Semana
+Meta: A meta da semana.
+
+Segunda-feira (2h)
+- Nome da tarefa (30min)
+...`}
+                    />
                     <div className="flex justify-end space-x-3 pt-4">
-                        <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md text-white font-semibold">Cancelar</button>
-                        <button onClick={handleConfirmApply} disabled={!selectedTemplate} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md text-white font-semibold disabled:bg-gray-500 disabled:cursor-not-allowed">Aplicar</button>
+                        <button onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md text-white font-semibold">Cancelar</button>
+                        <button onClick={handleConfirmImport} disabled={!importText.trim()} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md text-white font-semibold disabled:bg-gray-500 disabled:cursor-not-allowed">Confirmar Importação</button>
                     </div>
                 </div>
             </Modal>
+
         </div>
     );
 };

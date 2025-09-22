@@ -1,5 +1,5 @@
 
-import type { Week, KPI, Template, Task } from '../types';
+import type { Week, KPI, Task } from '../types';
 import { TaskStatus, TaskType } from '../types';
 
 export const SEED_WEEKS: Week[] = Array.from({ length: 12 }, (_, i) => {
@@ -36,16 +36,3 @@ export const SEED_KPIS: KPI[] = [
   { id: 'kpi3', name: 'Taxa de Follow-up', baseline: 0, target: 80, current: 0, unit: '%' },
   { id: 'kpi4', name: 'Taxa de Fechamento de Projetos', baseline: 0, target: 25, current: 0, unit: '%' },
 ];
-
-export const SEED_TEMPLATES: Template[] = Array.from({ length: 12 }, (_, i) => ({
-  id: `template-${i + 1}`,
-  week_number: i + 1,
-  title: i === 0 ? 'S1: Template de Fundamentos' : `Template para Semana ${i + 1}`,
-  goal: i === 0 ? 'Comece a jornada com fundamentos sólidos.' : `Meta para a semana ${i + 1}`,
-  tasks: i === 0 ? [
-    { id: 'tt1', title: 'Entender o cenário NoCode/LowCode', type: TaskType.Study, estimated_minutes: 60 },
-    { id: 'tt2', title: 'Explorar o básico do Zapier/Make', type: TaskType.Practice, estimated_minutes: 60 },
-    { id: 'tt3', title: 'Aprender sobre APIs e Webhooks', type: TaskType.Study, estimated_minutes: 90 },
-    { id: 'tt4', title: 'Construir uma automação simples de 2 passos', type: TaskType.Practice, estimated_minutes: 90 },
-  ] : [],
-}));
