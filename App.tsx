@@ -3,9 +3,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { LayoutDashboard, CalendarClock, FileText, ChevronRight, Download, Upload, Menu, X } from 'lucide-react';
 
 // Import types and components
-import type { Week, Day, Task, KPI, Template, Note, View } from './types';
-import { TaskStatus } from './types';
-import { SEED_WEEKS, SEED_KPIS, SEED_TEMPLATES } from './data/seed';
+import type { Week, Day, Task, KPI, Template, Note, View, TemplateTask } from './types';
+import { TaskStatus, TaskType } from './types';
+import { SEED_KPIS } from './data/seed';
 import Dashboard from './components/Dashboard';
 import WeekView from './components/WeekView';
 import { TodayView } from './components/TodayView';
@@ -21,6 +21,264 @@ type AppState = {
 
 const KEY = "app12_transformation_plan_v2";
 
+const uid = () => `id-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const iso = (d: Date) => d.toISOString().split('T')[0];
+
+// ===== NOVA distribuição por capacidade diária =====
+function distributeTemplateIntoWeekByCapacity(wk: Week, tpl: Template): Week {
+  const makeTask = (t: Template["tasks"][number]): Task => ({
+    id: uid(),
+    title: t.title,
+    type: t.type,
+    estimated_minutes: t.estimated_minutes,
+    status: TaskStatus.Todo,
+  });
+
+  // Fila de tarefas do template
+  const queue = tpl.tasks.map(makeTask);
+
+  const days = wk.days.map((day) => {
+    let remaining = day.planned_minutes;
+    const tasks: Task[] = [];
+
+    // Aloca tarefas do template enquanto couber
+    while (queue.length > 0 && queue[0].estimated_minutes <= remaining) {
+      const next = queue.shift()!;
+      tasks.push(next);
+      remaining -= next.estimated_minutes;
+    }
+
+    // Preenche com blocos de revisão/prática
+    const fillerTitle = `Revisão/Prática – ${tpl.title}`;
+    const pushFiller = (mins: number) => {
+      tasks.push({
+        id: uid(),
+        title: fillerTitle,
+        type: TaskType.Review,
+        estimated_minutes: mins,
+        status: TaskStatus.Todo,
+      });
+    };
+
+    while (remaining >= 60) { pushFiller(60); remaining -= 60; }
+    if (remaining >= 30) { pushFiller(30); remaining -= 30; }
+
+    // Garante ao menos 1 tarefa no dia
+    if (tasks.length === 0) {
+      pushFiller(Math.min(60, day.planned_minutes));
+    }
+
+    return { ...day, tasks };
+  });
+
+  // Se sobrar tarefa do template, reparte 1 por dia em segunda passada
+  if (queue.length > 0) {
+    let idx = 0;
+    while (queue.length > 0) {
+      const t = queue.shift()!;
+      const di = idx % days.length;
+      days[di] = { ...days[di], tasks: [...days[di].tasks, t] };
+      idx++;
+    }
+  }
+
+  return { ...wk, days, status: "in-progress", title: tpl.title, goal: tpl.goal };
+}
+
+// ===== NOVA initialState (12 semanas preenchidas) =====
+function initialState(): AppState {
+  // segunda-feira da semana atual
+  const now = new Date();
+  const monday = new Date(now);
+  const dow = monday.getDay(); // 0=domingo
+  const diffToMon = dow === 0 ? -6 : 1 - dow;
+  monday.setDate(monday.getDate() + diffToMon);
+
+  // helper p/ criar semana com capacidade: Seg–Sex 120min, Sáb–Dom 180min
+  const makeWeek = (baseMonday: Date, number: number, title: string, goal: string): Week => {
+    const days: Day[] = Array.from({ length: 7 }).map((_, i) => {
+      const dt = new Date(baseMonday);
+      dt.setDate(dt.getDate() + i);
+      const planned = (i === 5 || i === 6) ? 180 : 120;
+      return { id: uid(), date: iso(dt), planned_minutes: planned, tasks: [] };
+    });
+    return { id: uid(), number, title, goal, status: "pending", days };
+  };
+
+  // Metas por semana
+  const weekMeta: Array<{title:string; goal:string}> = [
+    { title: "Semana 1 – Fundamentos JS", goal: "Variáveis, if/else, arrays, loops, funções; mini-CRM em código" },
+    { title: "Semana 2 – APIs + Google Sheets", goal: "Consumir APIs (JSON) e gravar dados em planilha" },
+    { title: "Semana 3 – Banco (Airtable/Supabase)", goal: "Modelo de dados do CRM (Clientes, Orçamentos, Interações)" },
+    { title: "Semana 4 – n8n: Form → CRM → resposta", goal: "Fluxo inicial: formulário, registro no CRM e confirmação automática" },
+    { title: "Semana 5 – CRM Básico real", goal: "Cadastro real de clientes e status de vendas (Kanban)" },
+    { title: "Semana 6 – Pré-orçamento (rascunho)", goal: "Gerar rascunho de orçamento; envio humano validado" },
+    { title: "Semana 7 – Integração CRM + Pré-orçamento", goal: "Vincular rascunhos ao CRM; status automático em negociação" },
+    { title: "Semana 8 – App interno (Glide)", goal: "Consulta de clientes/orçamentos pela equipe" },
+    { title: "Semana 9 – Dashboard", goal: "Indicadores: clientes, orçamentos enviados, valor fechado" },
+    { title: "Semana 10 – Follow-up n8n", goal: "Lembretes automáticos suaves e log de interações" },
+    { title: "Semana 11 – Template comercial", goal: "Empacotar solução para reutilizar em outras empresas" },
+    { title: "Semana 12 – Pitch + Métricas", goal: "Apresentação e antes/depois dos KPIs" },
+  ];
+
+  // Cria as 12 semanas
+  let weeks: Week[] = Array.from({ length: 12 }).map((_, i) =>
+    makeWeek(
+      new Date(monday.getTime() + i * 7 * 24 * 60 * 60 * 1000),
+      i + 1,
+      weekMeta[i].title,
+      weekMeta[i].goal
+    )
+  );
+
+  // 12 templates (um por semana) — podem ser editados no app depois
+  const templates: Template[] = [
+    {
+      id: uid(), week_number: 1,
+      title: "Template Semana 1 – Fundamentos JS",
+      goal: "Entender variáveis, if/else, arrays, loops, funções; mini-CRM",
+      tasks: [
+        { id: uid(), title: "Variáveis + console", type: TaskType.Study, estimated_minutes: 40 },
+        { id: uid(), title: "If/Else exercícios", type: TaskType.Practice, estimated_minutes: 40 },
+        { id: uid(), title: "Arrays e Loops", type: TaskType.Study, estimated_minutes: 40 },
+        { id: uid(), title: "Funções", type: TaskType.Study, estimated_minutes: 40 },
+        { id: uid(), title: "Mini-CRM em JS", type: TaskType.Review, estimated_minutes: 60 },
+      ]
+    },
+    {
+      id: uid(), week_number: 2,
+      title: "Template Semana 2 – APIs + Sheets",
+      goal: "Consumir APIs e gravar em Google Sheets",
+      tasks: [
+        { id: uid(), title: "O que é API + JSON", type: TaskType.Study, estimated_minutes: 40 },
+        { id: uid(), title: "Testar API no Hoppscotch", type: TaskType.Practice, estimated_minutes: 30 },
+        { id: uid(), title: "Apps Script: gravar linha no Sheets", type: TaskType.Practice, estimated_minutes: 50 },
+        { id: uid(), title: "Mini projeto: API → Sheets", type: TaskType.Review, estimated_minutes: 60 },
+      ]
+    },
+    {
+      id: uid(), week_number: 3,
+      title: "Template Semana 3 – Banco (Airtable/Supabase)",
+      goal: "Modelar CRM (Clientes, Orçamentos, Interações)",
+      tasks: [
+        { id: uid(), title: "Modelo relacional do CRM", type: TaskType.Study, estimated_minutes: 45 },
+        { id: uid(), title: "Criar tabelas (Airtable ou Supabase)", type: TaskType.Practice, estimated_minutes: 60 },
+        { id: uid(), title: "Visual Kanban (status vendas)", type: TaskType.Practice, estimated_minutes: 30 },
+        { id: uid(), title: "Popular dados de teste", type: TaskType.Review, estimated_minutes: 30 },
+      ]
+    },
+    {
+      id: uid(), week_number: 4,
+      title: "Template Semana 4 – n8n fluxo inicial",
+      goal: "Formulário → CRM → resposta",
+      tasks: [
+        { id: uid(), title: "Instalar/abrir n8n", type: TaskType.Study, estimated_minutes: 30 },
+        { id: uid(), title: "Node Webhook + Sheets/Airtable", type: TaskType.Practice, estimated_minutes: 60 },
+        { id: uid(), title: "Responder e-mail/whatsapp simples", type: TaskType.Practice, estimated_minutes: 45 },
+        { id: uid(), title: "Ramo de erro (fallback)", type: TaskType.Review, estimated_minutes: 30 },
+      ]
+    },
+    {
+      id: uid(), week_number: 5,
+      title: "Template Semana 5 – CRM Básico real",
+      goal: "Cadastro real + status de vendas",
+      tasks: [
+        { id: uid(), title: "Campos essenciais do cliente", type: TaskType.Study, estimated_minutes: 30 },
+        { id: uid(), title: "Inserir contatos reais", type: TaskType.Practice, estimated_minutes: 60 },
+        { id: uid(), title: "Fluxo de atualização de status", type: TaskType.Practice, estimated_minutes: 45 },
+        { id: uid(), title: "Checklist de qualidade", type: TaskType.Review, estimated_minutes: 30 },
+      ]
+    },
+    {
+      id: uid(), week_number: 6,
+      title: "Template Semana 6 – Pré-orçamento",
+      goal: "Gerar rascunho; envio humano",
+      tasks: [
+        { id: uid(), title: "Definir campos do rascunho", type: TaskType.Study, estimated_minutes: 30 },
+        { id: uid(), title: "Cálculo aproximado (faixa de preço)", type: TaskType.Practice, estimated_minutes: 50 },
+        { id: uid(), title: "Gerar PDF rascunho (não enviar)", type: TaskType.Practice, estimated_minutes: 50 },
+        { id: uid(), title: "Revisão manual do envio", type: TaskType.Review, estimated_minutes: 30 },
+      ]
+    },
+    {
+      id: uid(), week_number: 7,
+      title: "Template Semana 7 – Integração CRM+Rascunho",
+      goal: "Vincular orçamentos ao CRM; status automático",
+      tasks: [
+        { id: uid(), title: "Relacionar rascunhos ao cliente", type: TaskType.Practice, estimated_minutes: 45 },
+        { id: uid(), title: "Atualizar status para 'em negociação'", type: TaskType.Practice, estimated_minutes: 30 },
+        { id: uid(), title: "Regras de negócio (campos obrigatórios)", type: TaskType.Study, estimated_minutes: 30 },
+        { id: uid(), title: "Teste de ponta a ponta", type: TaskType.Review, estimated_minutes: 45 },
+      ]
+    },
+    {
+      id: uid(), week_number: 8,
+      title: "Template Semana 8 – App interno (Glide)",
+      goal: "Consulta de clientes/orçamentos",
+      tasks: [
+        { id: uid(), title: "Criar app no Glide", type: TaskType.Study, estimated_minutes: 30 },
+        { id: uid(), title: "Listagem de clientes", type: TaskType.Practice, estimated_minutes: 45 },
+        { id: uid(), title: "Detalhe do orçamento (somente leitura)", type: TaskType.Practice, estimated_minutes: 45 },
+        { id: uid(), title: "Testar offline/caching", type: TaskType.Review, estimated_minutes: 30 },
+      ]
+    },
+    {
+      id: uid(), week_number: 9,
+      title: "Template Semana 9 – Dashboard",
+      goal: "Métricas de vendas e progresso",
+      tasks: [
+        { id: uid(), title: "Escolher ferramenta (Retool/Metabase)", type: TaskType.Study, estimated_minutes: 20 },
+        { id: uid(), title: "Total de clientes / em negociação", type: TaskType.Practice, estimated_minutes: 50 },
+        { id: uid(), title: "Valor fechado / período", type: TaskType.Practice, estimated_minutes: 50 },
+        { id: uid(), title: "Validação de dados", type: TaskType.Review, estimated_minutes: 30 },
+      ]
+    },
+    {
+      id: uid(), week_number: 10,
+      title: "Template Semana 10 – Follow-up n8n",
+      goal: "Lembretes + log de interações",
+      tasks: [
+        { id: uid(), title: "Regra 3 dias pós-envio", type: TaskType.Study, estimated_minutes: 30 },
+        { id: uid(), title: "Mensagem suave de follow-up", type: TaskType.Practice, estimated_minutes: 45 },
+        { id: uid(), title: "Evitar spam (throttle 72h)", type: TaskType.Practice, estimated_minutes: 45 },
+        { id: uid(), title: "Log no CRM", type: TaskType.Review, estimated_minutes: 30 },
+      ]
+    },
+    {
+      id: uid(), week_number: 11,
+      title: "Template Semana 11 – Template comercial",
+      goal: "Empacotar solução reutilizável",
+      tasks: [
+        { id: uid(), title: "Variáveis de ambiente (tokens/URLs)", type: TaskType.Study, estimated_minutes: 30 },
+        { id: uid(), title: "Documentação passo a passo", type: TaskType.Practice, estimated_minutes: 60 },
+        { id: uid(), title: "Checklist de implantação", type: TaskType.Review, estimated_minutes: 30 },
+        { id: uid(), title: "Teste com empresa amiga", type: TaskType.Practice, estimated_minutes: 45 },
+      ]
+    },
+    {
+      id: uid(), week_number: 12,
+      title: "Template Semana 12 – Pitch + KPIs",
+      goal: "Apresentar resultado e fechar 1º cliente",
+      tasks: [
+        { id: uid(), title: "Antes/Depois dos KPIs (TTEO, follow-up, fechamento)", type: TaskType.Review, estimated_minutes: 45 },
+        { id: uid(), title: "Slides de 1 página (problema → solução → benefícios)", type: TaskType.Practice, estimated_minutes: 60 },
+        { id: uid(), title: "Pitch com consultor/parceiro", type: TaskType.Practice, estimated_minutes: 45 },
+        { id: uid(), title: "Plano dos próximos 90 dias", type: TaskType.Study, estimated_minutes: 30 },
+      ]
+    },
+  ];
+
+  // Aplica automaticamente o template correspondente em CADA semana
+  weeks = weeks.map((wk) => {
+    const tpl = templates.find(t => t.week_number === wk.number);
+    return tpl ? distributeTemplateIntoWeekByCapacity(wk, tpl) : wk;
+  });
+
+  // Semana 1 já fica "in_progress" (definido dentro da distribuição)
+  return { weeks, kpis: SEED_KPIS, templates, notes: [] };
+}
+
+
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [weeks, setWeeks] = useState<Week[]>([]);
@@ -35,28 +293,34 @@ function App() {
 
   // Load and save state from/to localStorage
   useEffect(() => {
+    const loadInitialState = () => {
+      const state = initialState();
+      setWeeks(state.weeks);
+      setKpis(state.kpis);
+      setTemplates(state.templates);
+      setNotes(state.notes);
+    };
+
     try {
         const rawState = localStorage.getItem(KEY);
         if (rawState) {
           const state: AppState = JSON.parse(rawState);
-          setWeeks(state.weeks || SEED_WEEKS);
-          setKpis(state.kpis || SEED_KPIS);
-          setTemplates(state.templates || SEED_TEMPLATES);
-          setNotes(state.notes || []);
+          // Check for essential data, if not present, reload initial state
+          // This handles cases where the app structure changed.
+          if (!state.weeks || state.weeks.length === 0 || !state.kpis || !state.templates) {
+            loadInitialState();
+          } else {
+            setWeeks(state.weeks);
+            setKpis(state.kpis);
+            setTemplates(state.templates);
+            setNotes(state.notes || []);
+          }
         } else {
-          // Initialize with seed data if no saved state
-          setWeeks(SEED_WEEKS);
-          setKpis(SEED_KPIS);
-          setTemplates(SEED_TEMPLATES);
-          setNotes([]);
+          loadInitialState();
         }
     } catch (error) {
         console.error("Failed to parse state from localStorage", error);
-        // Fallback to seed data on error
-        setWeeks(SEED_WEEKS);
-        setKpis(SEED_KPIS);
-        setTemplates(SEED_TEMPLATES);
-        setNotes([]);
+        loadInitialState();
     }
     setIsInitialized(true);
   }, []);
@@ -104,32 +368,11 @@ function App() {
       const weekIndex = newWeeks.findIndex(w => w.number === weekNumber);
       if (weekIndex === -1) return prevWeeks;
       
-      const newWeek = { ...newWeeks[weekIndex] };
-      newWeek.title = template.title;
-      newWeek.goal = template.goal;
-
-      // Clear existing tasks
-      newWeek.days.forEach(day => day.tasks = []);
+      // We need a pristine week structure to apply the template distribution logic
+      const originalWeekStructure = initialState().weeks[weekIndex];
+      const weekWithTemplate = distributeTemplateIntoWeekByCapacity(originalWeekStructure, template);
       
-      // Distribute template tasks across the week
-      const tasksToDistribute = [...template.tasks];
-      let dayIndex = 0;
-      while(tasksToDistribute.length > 0) {
-        const taskTemplate = tasksToDistribute.shift();
-        if(taskTemplate) {
-            const newTask: Task = {
-                id: `task-${Date.now()}-${Math.random()}`,
-                title: taskTemplate.title,
-                type: taskTemplate.type,
-                estimated_minutes: taskTemplate.estimated_minutes,
-                status: TaskStatus.Todo,
-            };
-            newWeek.days[dayIndex % 7].tasks.push(newTask);
-            dayIndex++;
-        }
-      }
-
-      newWeeks[weekIndex] = newWeek;
+      newWeeks[weekIndex] = weekWithTemplate;
       return newWeeks;
     });
   };
