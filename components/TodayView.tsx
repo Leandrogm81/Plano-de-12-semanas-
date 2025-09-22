@@ -19,6 +19,25 @@ const PomodoroTimer: React.FC<{ activeTask: Task | null }> = ({ activeTask }) =>
   const [isActive, setIsActive] = useState(false);
   const [isBreak, setIsBreak] = useState(false);
 
+  const playSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 0.01);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(isBreak ? 440 : 880, audioContext.currentTime); // Different sound for break vs focus
+    
+    oscillator.start(audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 1);
+    oscillator.stop(audioContext.currentTime + 1);
+  };
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
     if (isActive) {
@@ -29,37 +48,46 @@ const PomodoroTimer: React.FC<{ activeTask: Task | null }> = ({ activeTask }) =>
           setMinutes(minutes - 1);
           setSeconds(59);
         } else {
+          playSound();
           setIsActive(false);
           setIsBreak(prev => !prev);
-          alert(`${isBreak ? 'Pausa' : 'Pomodoro'} finalizado!`);
-          resetTimer();
+          // Auto-start next timer after a short delay
+          setTimeout(() => {
+              resetTimer(true); // pass true to indicate it's the start of a new phase
+          }, 1500);
         }
       }, 1000);
-    } else if (!isActive && seconds !== 0) {
-      clearInterval(interval!);
     }
-    return () => clearInterval(interval!);
+    return () => {
+        if(interval) clearInterval(interval);
+    };
   }, [isActive, seconds, minutes, isBreak]);
 
   const toggleTimer = () => setIsActive(!isActive);
 
-  const resetTimer = () => {
+  const resetTimer = (isNewPhase = false) => {
     setIsActive(false);
-    setMinutes(isBreak ? 5 : 25);
+    // When a phase ends, `isBreak` has already been flipped for the *next* phase.
+    // So if isBreak is true, it means the focus session just ended, and we are setting up for a break.
+    setMinutes(isNewPhase ? (isBreak ? 5 : 25) : 25);
     setSeconds(0);
+    if (!isNewPhase) {
+        setIsBreak(false);
+    }
   };
+
 
   const progress = ((isBreak ? 5 : 25) * 60 - (minutes * 60 + seconds)) / ((isBreak ? 5 : 25) * 60) * 100;
 
   return (
     <div className="bg-gray-800 p-6 rounded-lg shadow-lg text-center">
         <h2 className="text-xl font-bold mb-2">Cronômetro Pomodoro</h2>
-        <p className="text-gray-400 mb-4 h-6">{activeTask ? `Trabalhando em: ${activeTask.title}` : 'Selecione uma tarefa para começar'}</p>
+        <p className="text-gray-400 mb-4 h-6">{activeTask ? `Foco: ${activeTask.title}` : 'Selecione uma tarefa para começar'}</p>
         <div className="relative w-48 h-48 mx-auto mb-4">
             <svg className="w-full h-full" viewBox="0 0 100 100">
                 <circle className="text-gray-700" strokeWidth="7" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" />
                 <circle
-                className="text-indigo-500"
+                className={isBreak ? "text-green-500" : "text-indigo-500"}
                 strokeWidth="7"
                 strokeDasharray="283"
                 strokeDashoffset={283 - (progress / 100) * 283}
@@ -72,15 +100,20 @@ const PomodoroTimer: React.FC<{ activeTask: Task | null }> = ({ activeTask }) =>
                 style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
                 />
             </svg>
-            <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-4xl font-bold">
-                {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+            <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center">
+                 <div className="text-4xl font-bold">
+                    {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+                </div>
+                <div className="text-sm uppercase tracking-wider text-gray-400 mt-1">
+                    {isBreak ? 'Pausa' : 'Foco'}
+                </div>
             </div>
         </div>
       <div className="flex justify-center space-x-4">
         <button onClick={toggleTimer} className="p-3 bg-indigo-600 hover:bg-indigo-700 rounded-full text-white transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed" disabled={!activeTask}>
           {isActive ? <Pause size={24} /> : <Play size={24} />}
         </button>
-        <button onClick={resetTimer} className="p-3 bg-gray-600 hover:bg-gray-500 rounded-full text-white transition-colors">
+        <button onClick={() => resetTimer(false)} className="p-3 bg-gray-600 hover:bg-gray-500 rounded-full text-white transition-colors">
           <RotateCcw size={24} />
         </button>
       </div>
@@ -106,6 +139,14 @@ export const TodayView: React.FC<TodayViewProps> = ({ day, weeks, onTaskStatusCh
         }
         return null;
     }, [day, weeks]);
+
+    useEffect(() => {
+        // Automatically select the first 'todo' task of the day
+        if (day && day.tasks.length > 0) {
+            const firstTodo = day.tasks.find(t => t.status === TaskStatus.Todo);
+            setActiveTask(firstTodo || null);
+        }
+    }, [day]);
 
     const handleStatusChange = (taskIndex: number, status: TaskStatus) => {
         if(!dayInfo) return;

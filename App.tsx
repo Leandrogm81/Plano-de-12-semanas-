@@ -85,6 +85,7 @@ function distributeTemplateIntoWeekByCapacity(wk: Week, tpl: Template): Week {
   return { ...wk, days, status: "in-progress", title: tpl.title, goal: tpl.goal };
 }
 
+
 // ===== NOVA initialState (12 semanas preenchidas) =====
 function initialState(): AppState {
   // segunda-feira da semana atual
@@ -307,7 +308,7 @@ function App() {
           const state: AppState = JSON.parse(rawState);
           // Check for essential data, if not present, reload initial state
           // This handles cases where the app structure changed.
-          if (!state.weeks || state.weeks.length === 0 || !state.kpis || !state.templates) {
+          if (!state.weeks || state.weeks.length < 12 || !state.kpis || !state.templates) {
             loadInitialState();
           } else {
             setWeeks(state.weeks);
@@ -368,11 +369,14 @@ function App() {
       const weekIndex = newWeeks.findIndex(w => w.number === weekNumber);
       if (weekIndex === -1) return prevWeeks;
       
-      // We need a pristine week structure to apply the template distribution logic
-      const originalWeekStructure = initialState().weeks[weekIndex];
-      const weekWithTemplate = distributeTemplateIntoWeekByCapacity(originalWeekStructure, template);
-      
-      newWeeks[weekIndex] = weekWithTemplate;
+      const pristineWeeks = initialState().weeks;
+      const originalWeekStructure = pristineWeeks.find(w => w.number === weekNumber);
+
+      if (originalWeekStructure) {
+        const weekWithTemplate = distributeTemplateIntoWeekByCapacity(originalWeekStructure, template);
+        newWeeks[weekIndex] = weekWithTemplate;
+      }
+
       return newWeeks;
     });
   };
