@@ -46,13 +46,14 @@ const TaskItem: React.FC<{ task: Task, onStatusChange: (status: TaskStatus) => v
 
 const DayCard: React.FC<{ day: Day, onTaskStatusChange: (taskIndex: number, status: TaskStatus) => void }> = ({ day, onTaskStatusChange }) => {
     const dayName = new Date(day.date).toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'UTC' });
+    const formattedDate = new Date(day.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
     const tasksDone = day.tasks.filter(t => t.status === TaskStatus.Done).length;
     const allTasksDone = day.tasks.length > 0 && tasksDone === day.tasks.length;
 
     return (
         <div className="bg-gray-800 p-4 rounded-lg shadow-md flex-grow">
             <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg capitalize">{dayName} <span className="text-gray-400 text-sm font-normal">{day.date}</span></h3>
+                <h3 className="font-bold text-lg capitalize">{dayName} <span className="text-gray-400 text-sm font-normal">{formattedDate}</span></h3>
                 {allTasksDone && <CheckCircle className="text-green-500"/>}
             </div>
             <div className="space-y-2">

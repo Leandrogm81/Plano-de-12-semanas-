@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Day, Task, Note, Week } from '../types';
 import { TaskStatus } from '../types';
@@ -175,7 +174,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ day, weeks, onTaskStatusCh
             <div className="lg:col-span-2 space-y-6">
                 <header>
                     <h1 className="text-3xl font-bold">Foco de Hoje</h1>
-                    <p className="text-gray-400 capitalize">{new Date(day.date).toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}</p>
+                    <p className="text-gray-400 capitalize">{new Date(day.date).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })}</p>
                 </header>
                 <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
                     <div className="flex justify-between items-center mb-4">
