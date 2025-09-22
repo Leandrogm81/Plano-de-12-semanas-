@@ -8,7 +8,6 @@ import { SEED_KPIS } from './data/seed';
 import Dashboard from './components/Dashboard';
 import WeekView from './components/WeekView';
 import { TodayView } from './components/TodayView';
-import TemplatesView from './components/TemplatesView';
 
 // AppState structure for localStorage
 type AppState = {

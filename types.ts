@@ -61,20 +61,4 @@ export interface Note {
     createdAt: string;
 }
 
-// FIX: Add missing TemplateTask and Template types to resolve errors in TemplatesView.tsx.
-export interface TemplateTask {
-  id: string;
-  title: string;
-  type: TaskType;
-  estimated_minutes: number;
-}
-
-export interface Template {
-  id: string;
-  week_number: number;
-  title: string;
-  goal: string;
-  tasks: TemplateTask[];
-}
-
 export type View = 'dashboard' | 'weeks' | 'today';
