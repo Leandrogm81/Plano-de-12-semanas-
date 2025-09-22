@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { LayoutDashboard, CalendarClock, FileText, ChevronRight, Download, Upload, Menu, X } from 'lucide-react';
 
@@ -108,18 +107,18 @@ function initialState(): AppState {
 
   // Metas por semana
   const weekMeta: Array<{title:string; goal:string}> = [
-    { title: "Semana 1 – Fundamentos JS", goal: "Variáveis, if/else, arrays, loops, funções; mini-CRM em código" },
-    { title: "Semana 2 – APIs + Google Sheets", goal: "Consumir APIs (JSON) e gravar dados em planilha" },
-    { title: "Semana 3 – Banco (Airtable/Supabase)", goal: "Modelo de dados do CRM (Clientes, Orçamentos, Interações)" },
-    { title: "Semana 4 – n8n: Form → CRM → resposta", goal: "Fluxo inicial: formulário, registro no CRM e confirmação automática" },
-    { title: "Semana 5 – CRM Básico real", goal: "Cadastro real de clientes e status de vendas (Kanban)" },
-    { title: "Semana 6 – Pré-orçamento (rascunho)", goal: "Gerar rascunho de orçamento; envio humano validado" },
-    { title: "Semana 7 – Integração CRM + Pré-orçamento", goal: "Vincular rascunhos ao CRM; status automático em negociação" },
-    { title: "Semana 8 – App interno (Glide)", goal: "Consulta de clientes/orçamentos pela equipe" },
-    { title: "Semana 9 – Dashboard", goal: "Indicadores: clientes, orçamentos enviados, valor fechado" },
-    { title: "Semana 10 – Follow-up n8n", goal: "Lembretes automáticos suaves e log de interações" },
-    { title: "Semana 11 – Template comercial", goal: "Empacotar solução para reutilizar em outras empresas" },
-    { title: "Semana 12 – Pitch + Métricas", goal: "Apresentação e antes/depois dos KPIs" },
+    { title: "Semana 1", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 2", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 3", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 4", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 5", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 6", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 7", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 8", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 9", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 10", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 11", goal: "Defina um objetivo claro para esta semana." },
+    { title: "Semana 12", goal: "Defina um objetivo claro para esta semana." },
   ];
 
   // Cria as 12 semanas
@@ -132,142 +131,8 @@ function initialState(): AppState {
     )
   );
 
-  // 12 templates (um por semana) — podem ser editados no app depois
-  const templates: Template[] = [
-    {
-      id: uid(), week_number: 1,
-      title: "Template Semana 1 – Fundamentos JS",
-      goal: "Entender variáveis, if/else, arrays, loops, funções; mini-CRM",
-      tasks: [
-        { id: uid(), title: "Variáveis + console", type: TaskType.Study, estimated_minutes: 40 },
-        { id: uid(), title: "If/Else exercícios", type: TaskType.Practice, estimated_minutes: 40 },
-        { id: uid(), title: "Arrays e Loops", type: TaskType.Study, estimated_minutes: 40 },
-        { id: uid(), title: "Funções", type: TaskType.Study, estimated_minutes: 40 },
-        { id: uid(), title: "Mini-CRM em JS", type: TaskType.Review, estimated_minutes: 60 },
-      ]
-    },
-    {
-      id: uid(), week_number: 2,
-      title: "Template Semana 2 – APIs + Sheets",
-      goal: "Consumir APIs e gravar em Google Sheets",
-      tasks: [
-        { id: uid(), title: "O que é API + JSON", type: TaskType.Study, estimated_minutes: 40 },
-        { id: uid(), title: "Testar API no Hoppscotch", type: TaskType.Practice, estimated_minutes: 30 },
-        { id: uid(), title: "Apps Script: gravar linha no Sheets", type: TaskType.Practice, estimated_minutes: 50 },
-        { id: uid(), title: "Mini projeto: API → Sheets", type: TaskType.Review, estimated_minutes: 60 },
-      ]
-    },
-    {
-      id: uid(), week_number: 3,
-      title: "Template Semana 3 – Banco (Airtable/Supabase)",
-      goal: "Modelar CRM (Clientes, Orçamentos, Interações)",
-      tasks: [
-        { id: uid(), title: "Modelo relacional do CRM", type: TaskType.Study, estimated_minutes: 45 },
-        { id: uid(), title: "Criar tabelas (Airtable ou Supabase)", type: TaskType.Practice, estimated_minutes: 60 },
-        { id: uid(), title: "Visual Kanban (status vendas)", type: TaskType.Practice, estimated_minutes: 30 },
-        { id: uid(), title: "Popular dados de teste", type: TaskType.Review, estimated_minutes: 30 },
-      ]
-    },
-    {
-      id: uid(), week_number: 4,
-      title: "Template Semana 4 – n8n fluxo inicial",
-      goal: "Formulário → CRM → resposta",
-      tasks: [
-        { id: uid(), title: "Instalar/abrir n8n", type: TaskType.Study, estimated_minutes: 30 },
-        { id: uid(), title: "Node Webhook + Sheets/Airtable", type: TaskType.Practice, estimated_minutes: 60 },
-        { id: uid(), title: "Responder e-mail/whatsapp simples", type: TaskType.Practice, estimated_minutes: 45 },
-        { id: uid(), title: "Ramo de erro (fallback)", type: TaskType.Review, estimated_minutes: 30 },
-      ]
-    },
-    {
-      id: uid(), week_number: 5,
-      title: "Template Semana 5 – CRM Básico real",
-      goal: "Cadastro real + status de vendas",
-      tasks: [
-        { id: uid(), title: "Campos essenciais do cliente", type: TaskType.Study, estimated_minutes: 30 },
-        { id: uid(), title: "Inserir contatos reais", type: TaskType.Practice, estimated_minutes: 60 },
-        { id: uid(), title: "Fluxo de atualização de status", type: TaskType.Practice, estimated_minutes: 45 },
-        { id: uid(), title: "Checklist de qualidade", type: TaskType.Review, estimated_minutes: 30 },
-      ]
-    },
-    {
-      id: uid(), week_number: 6,
-      title: "Template Semana 6 – Pré-orçamento",
-      goal: "Gerar rascunho; envio humano",
-      tasks: [
-        { id: uid(), title: "Definir campos do rascunho", type: TaskType.Study, estimated_minutes: 30 },
-        { id: uid(), title: "Cálculo aproximado (faixa de preço)", type: TaskType.Practice, estimated_minutes: 50 },
-        { id: uid(), title: "Gerar PDF rascunho (não enviar)", type: TaskType.Practice, estimated_minutes: 50 },
-        { id: uid(), title: "Revisão manual do envio", type: TaskType.Review, estimated_minutes: 30 },
-      ]
-    },
-    {
-      id: uid(), week_number: 7,
-      title: "Template Semana 7 – Integração CRM+Rascunho",
-      goal: "Vincular orçamentos ao CRM; status automático",
-      tasks: [
-        { id: uid(), title: "Relacionar rascunhos ao cliente", type: TaskType.Practice, estimated_minutes: 45 },
-        { id: uid(), title: "Atualizar status para 'em negociação'", type: TaskType.Practice, estimated_minutes: 30 },
-        { id: uid(), title: "Regras de negócio (campos obrigatórios)", type: TaskType.Study, estimated_minutes: 30 },
-        { id: uid(), title: "Teste de ponta a ponta", type: TaskType.Review, estimated_minutes: 45 },
-      ]
-    },
-    {
-      id: uid(), week_number: 8,
-      title: "Template Semana 8 – App interno (Glide)",
-      goal: "Consulta de clientes/orçamentos",
-      tasks: [
-        { id: uid(), title: "Criar app no Glide", type: TaskType.Study, estimated_minutes: 30 },
-        { id: uid(), title: "Listagem de clientes", type: TaskType.Practice, estimated_minutes: 45 },
-        { id: uid(), title: "Detalhe do orçamento (somente leitura)", type: TaskType.Practice, estimated_minutes: 45 },
-        { id: uid(), title: "Testar offline/caching", type: TaskType.Review, estimated_minutes: 30 },
-      ]
-    },
-    {
-      id: uid(), week_number: 9,
-      title: "Template Semana 9 – Dashboard",
-      goal: "Métricas de vendas e progresso",
-      tasks: [
-        { id: uid(), title: "Escolher ferramenta (Retool/Metabase)", type: TaskType.Study, estimated_minutes: 20 },
-        { id: uid(), title: "Total de clientes / em negociação", type: TaskType.Practice, estimated_minutes: 50 },
-        { id: uid(), title: "Valor fechado / período", type: TaskType.Practice, estimated_minutes: 50 },
-        { id: uid(), title: "Validação de dados", type: TaskType.Review, estimated_minutes: 30 },
-      ]
-    },
-    {
-      id: uid(), week_number: 10,
-      title: "Template Semana 10 – Follow-up n8n",
-      goal: "Lembretes + log de interações",
-      tasks: [
-        { id: uid(), title: "Regra 3 dias pós-envio", type: TaskType.Study, estimated_minutes: 30 },
-        { id: uid(), title: "Mensagem suave de follow-up", type: TaskType.Practice, estimated_minutes: 45 },
-        { id: uid(), title: "Evitar spam (throttle 72h)", type: TaskType.Practice, estimated_minutes: 45 },
-        { id: uid(), title: "Log no CRM", type: TaskType.Review, estimated_minutes: 30 },
-      ]
-    },
-    {
-      id: uid(), week_number: 11,
-      title: "Template Semana 11 – Template comercial",
-      goal: "Empacotar solução reutilizável",
-      tasks: [
-        { id: uid(), title: "Variáveis de ambiente (tokens/URLs)", type: TaskType.Study, estimated_minutes: 30 },
-        { id: uid(), title: "Documentação passo a passo", type: TaskType.Practice, estimated_minutes: 60 },
-        { id: uid(), title: "Checklist de implantação", type: TaskType.Review, estimated_minutes: 30 },
-        { id: uid(), title: "Teste com empresa amiga", type: TaskType.Practice, estimated_minutes: 45 },
-      ]
-    },
-    {
-      id: uid(), week_number: 12,
-      title: "Template Semana 12 – Pitch + KPIs",
-      goal: "Apresentar resultado e fechar 1º cliente",
-      tasks: [
-        { id: uid(), title: "Antes/Depois dos KPIs (TTEO, follow-up, fechamento)", type: TaskType.Review, estimated_minutes: 45 },
-        { id: uid(), title: "Slides de 1 página (problema → solução → benefícios)", type: TaskType.Practice, estimated_minutes: 60 },
-        { id: uid(), title: "Pitch com consultor/parceiro", type: TaskType.Practice, estimated_minutes: 45 },
-        { id: uid(), title: "Plano dos próximos 90 dias", type: TaskType.Study, estimated_minutes: 30 },
-      ]
-    },
-  ];
+  // Templates começam vazios
+  const templates: Template[] = [];
 
   // Aplica automaticamente o template correspondente em CADA semana
   weeks = weeks.map((wk) => {
@@ -275,7 +140,11 @@ function initialState(): AppState {
     return tpl ? distributeTemplateIntoWeekByCapacity(wk, tpl) : wk;
   });
 
-  // Semana 1 já fica "in_progress" (definido dentro da distribuição)
+  // Semana 1 já fica "in_progress"
+  if (weeks.length > 0) {
+      weeks[0].status = 'in-progress';
+  }
+  
   return { weeks, kpis: SEED_KPIS, templates, notes: [] };
 }
 
@@ -397,7 +266,7 @@ function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "app12-backup.json";
+    a.download = "agenda-backup.json";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -477,7 +346,7 @@ function App() {
       
       <aside className={`fixed inset-y-0 left-0 z-30 flex flex-col bg-gray-800 border-r border-gray-700 w-64 transition-transform duration-300 ease-in-out transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 lg:transition-all ${isSidebarCollapsed ? 'lg:w-20' : 'lg:w-64'}`}>
         <div className="flex items-center h-16 px-4 border-b border-gray-700 flex-shrink-0">
-            {!isSidebarCollapsed && <h1 className="text-xl font-bold text-white whitespace-nowrap hidden lg:block">Plano de 12 Semanas</h1>}
+            {!isSidebarCollapsed && <h1 className="text-xl font-bold text-white whitespace-nowrap hidden lg:block">Agenda</h1>}
             
             <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className={`p-2 rounded-md hover:bg-gray-700 hidden lg:block ${!isSidebarCollapsed ? 'ml-auto' : 'mx-auto'}`}>
                 <ChevronRight className={`h-6 w-6 transform transition-transform duration-300 ${isSidebarCollapsed ? 'rotate-180' : ''}`} />
